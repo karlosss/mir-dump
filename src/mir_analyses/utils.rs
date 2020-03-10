@@ -5,7 +5,7 @@
 //! Various helper functions for working with `mir::Place`.
 
 use log::trace;
-use rustc_data_structures::indexed_vec::Idx;
+use rustc_index::vec::Idx;
 use rustc::mir;
 use rustc::ty::{self, TyCtxt};
 use std::collections::HashSet;
@@ -39,7 +39,7 @@ pub fn is_prefix(place: &mir::Place, potential_prefix: &mir::Place) -> bool {
 pub fn expand_struct_place<'a, 'tcx: 'a>(
     place: &mir::Place<'tcx>,
     mir: &mir::Mir<'tcx>,
-    tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    tcx: TyCtxt<'tcx>,
     without_element: Option<usize>,
 ) -> Vec<mir::Place<'tcx>> {
     let mut places = Vec::new();
@@ -97,7 +97,7 @@ pub fn expand_struct_place<'a, 'tcx: 'a>(
 /// x.f.f, x.f.h, x.f.g.f, x.f.g.g}`.
 pub fn expand<'a, 'tcx: 'a>(
     mir: &mir::Mir<'tcx>,
-    tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    tcx: TyCtxt<'tcx>,
     minuend: &mir::Place<'tcx>,
     subtrahend: &mir::Place<'tcx>,
 ) -> Vec<mir::Place<'tcx>> {
@@ -114,7 +114,7 @@ pub fn expand<'a, 'tcx: 'a>(
     fn expand_recursively<'a, 'tcx: 'a>(
         place_set: &mut Vec<mir::Place<'tcx>>,
         mir: &mir::Mir<'tcx>,
-        tcx: TyCtxt<'a, 'tcx, 'tcx>,
+        tcx: TyCtxt<'tcx>,
         minuend: &mir::Place<'tcx>,
         subtrahend: &mir::Place<'tcx>,
     ) {
@@ -160,7 +160,7 @@ pub fn expand<'a, 'tcx: 'a>(
 /// `expand_struct_place`.
 pub fn collapse<'a, 'tcx: 'a>(
     mir: &mir::Mir<'tcx>,
-    tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    tcx: TyCtxt<'tcx>,
     places: &mut HashSet<mir::Place<'tcx>>,
     guide_place: &mir::Place<'tcx>,
 ) {

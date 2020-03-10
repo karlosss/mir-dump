@@ -5,13 +5,8 @@
 #![feature(box_syntax)]
 #![feature(rustc_private)]
 
-extern crate rustc;
-extern crate rustc_codegen_utils;
-extern crate rustc_driver;
-extern crate rustc_errors;
-extern crate rustc_metadata;
-extern crate syntax_pos;
-extern crate syntax;
+extern crate rustc_ap_rustc_span as syntax_pos;
+extern crate rustc_ap_syntax as syntax;
 
 mod driver_utils;
 

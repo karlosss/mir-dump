@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use log::debug;
-use rustc::hir::def_id::DefId;
+use rustc_hir::def_id::DefId;
 use rustc::mir;
 use rustc::ty;
 use std::collections::HashMap;
@@ -109,7 +109,7 @@ fn add_fake_facts<'a, 'tcx:'a>(
 }
 
 impl PoloniusInfo {
-    pub fn new<'a, 'tcx: 'a>(tcx: ty::TyCtxt<'a, 'tcx, 'tcx>, def_id: DefId, mir: &'a mir::Mir<'tcx>) -> Self {
+    pub fn new<'a, 'tcx: 'a>(tcx: ty::TyCtxt<'tcx>, def_id: DefId, mir: &'a mir::Mir<'tcx>) -> Self {
         // Read Polonius facts.
         let def_path = tcx.hir.def_path(def_id);
         let dir_path = PathBuf::from("nll-facts").join(def_path.to_filename_friendly_no_crate());
@@ -186,8 +186,7 @@ fn is_call<'tcx>(mir: &mir::Mir<'tcx>,
 }
 
 /// Extract the call terminator at the location. Otherwise return None.
-fn get_call_destination<'tcx>(mir: &mir::Mir<'tcx>,
-                              location: mir::Location) -> Option<mir::Place<'tcx>> {
+fn get_call_destination<'tcx>(mir: &mir::Mir<'tcx>, location: mir::Location) -> Option<mir::Place<'tcx>> {
     let mir::BasicBlockData { ref statements, ref terminator, .. } = mir[location.block];
     if statements.len() != location.statement_index {
         return None;

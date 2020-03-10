@@ -26,8 +26,12 @@ csv = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 rustc-hash = "1.0.0"
-polonius = { git = "https://github.com/rust-lang-nursery/polonius.git" }
+polonius = "0.3.0"
+datafrog = "2.0.1"
 polonius-engine = "0.5.0"
+rustc-ap-syntax = "645.0.0"
+rustc-ap-rustc_span = "647.0.0"
+rustc-ap-rustc_data_structures = "647.0.0"
 
 [dev-dependencies]
 compiletest_rs = "0.3"

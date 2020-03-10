@@ -9,10 +9,14 @@
 extern crate datafrog;
 extern crate rustc;
 extern crate rustc_hash;
-extern crate rustc_driver;
-extern crate syntax;
-extern crate syntax_pos;
-extern crate rustc_data_structures;
+extern crate rustc_driver as driver;
+extern crate rustc_index;
+extern crate rustc_hir;
+extern crate rustc_mir;
+extern crate rustc_ty;
+extern crate rustc_ap_syntax as syntax;
+extern crate rustc_ap_rustc_span as syntax_pos;
+extern crate rustc_ap_rustc_data_structures as rustc_data_structures;
 
 pub mod configuration;
 pub mod mir_dumper;

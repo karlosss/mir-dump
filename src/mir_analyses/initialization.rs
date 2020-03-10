@@ -42,7 +42,7 @@ struct DefinitelyInitializedAnalysis<'a, 'tcx: 'a> {
     /// Work queue.
     queue: Vec<WorkItem>,
     mir: &'a mir::Mir<'tcx>,
-    tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    tcx: TyCtxt<'tcx>,
     /// Should we intersect or union the incoming branches?
     ///
     /// We need first to compute the fix-point by using `Union` because
@@ -53,7 +53,7 @@ struct DefinitelyInitializedAnalysis<'a, 'tcx: 'a> {
 }
 
 impl<'a, 'tcx: 'a> DefinitelyInitializedAnalysis<'a, 'tcx> {
-    fn new(mir: &'a mir::Mir<'tcx>, tcx: TyCtxt<'a, 'tcx, 'tcx>) -> Self {
+    fn new(mir: &'a mir::Mir<'tcx>, tcx: TyCtxt<'tcx>) -> Self {
         Self {
             result: DefinitelyInitializedAnalysisResult::new(),
             mir: mir,
@@ -348,7 +348,7 @@ impl<'a, 'tcx: 'a> DefinitelyInitializedAnalysis<'a, 'tcx> {
 /// point.
 pub fn compute_definitely_initialized<'a, 'tcx: 'a>(
     mir: &'a mir::Mir<'tcx>,
-    tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    tcx: TyCtxt<'tcx>,
     def_path: hir::map::DefPath,
 ) -> DefinitelyInitializedAnalysisResult<'tcx> {
     let mut analysis = DefinitelyInitializedAnalysis::new(mir, tcx);

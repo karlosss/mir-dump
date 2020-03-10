@@ -3,8 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use log::trace;
-use rustc_driver::driver;
-use rustc::hir::{self, intravisit};
+use rustc_hir::{self, intravisit};
 use rustc::mir;
 use rustc::ty::{self, TyCtxt};
 use syntax::ast;
@@ -36,7 +35,7 @@ pub fn dump_info<'r, 'a: 'r, 'tcx: 'a>(state: &'r mut driver::CompileState<'a, '
 }
 
 struct InfoPrinter<'a, 'tcx: 'a> {
-    pub tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    pub tcx: TyCtxt<'tcx>,
 }
 
 impl<'a, 'tcx> intravisit::Visitor<'tcx> for InfoPrinter<'a, 'tcx> {
@@ -45,8 +44,8 @@ impl<'a, 'tcx> intravisit::Visitor<'tcx> for InfoPrinter<'a, 'tcx> {
         intravisit::NestedVisitorMap::All(map)
     }
 
-    fn visit_fn(&mut self, fk: intravisit::FnKind<'tcx>, _fd: &'tcx hir::FnDecl,
-                _b: hir::BodyId, _s: Span, node_id: ast::NodeId) {
+    fn visit_fn(&mut self, fk: intravisit::FnKind<'tcx>, _fd: &'tcx rustc_hir::FnDecl,
+                _b: rustc_hir::BodyId, _s: Span, node_id: ast::NodeId) {
         let name = match fk {
             intravisit::FnKind::ItemFn(name, ..) => name,
             _ => return,
@@ -98,8 +97,8 @@ impl<'a, 'tcx> intravisit::Visitor<'tcx> for InfoPrinter<'a, 'tcx> {
 }
 
 struct MirInfoPrinter<'a, 'tcx: 'a> {
-    pub def_path: hir::map::DefPath,
-    pub tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    pub def_path: rustc::hir::map::definitions::DefPath,
+    pub tcx: TyCtxt<'tcx>,
     pub mir: &'a mir::Mir<'tcx>,
     pub graph: cell::RefCell<BufWriter<File>>,
     pub initialization: DefinitelyInitializedAnalysisResult<'tcx>,

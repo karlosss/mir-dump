@@ -9,7 +9,7 @@ use log::{debug, trace};
 use super::facts;
 use regex::Regex;
 use rustc::mir;
-use rustc_data_structures::indexed_vec::Idx;
+use rustc_index::vec::Idx;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};

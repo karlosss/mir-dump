@@ -11,7 +11,7 @@
 use csv::ReaderBuilder;
 use regex::Regex;
 use rustc::mir;
-use rustc_data_structures::indexed_vec::Idx;
+use rustc_index::vec::Idx;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::hash::Hash;

@@ -52,7 +52,7 @@ impl<'tcx> PlaceSet<'tcx> {
         &mut self,
         place: &mir::Place<'tcx>,
         mir: &mir::Mir<'tcx>,
-        tcx: TyCtxt<'a, 'tcx, 'tcx>,
+        tcx: TyCtxt<'tcx>,
     ) {
         self.check_invariant();
         // First, check that the place is not already marked as
@@ -74,7 +74,7 @@ impl<'tcx> PlaceSet<'tcx> {
         &mut self,
         place: &mir::Place<'tcx>,
         mir: &mir::Mir<'tcx>,
-        tcx: TyCtxt<'a, 'tcx, 'tcx>,
+        tcx: TyCtxt<'tcx>,
     ) {
         self.check_invariant();
         let mut places = Vec::new();
