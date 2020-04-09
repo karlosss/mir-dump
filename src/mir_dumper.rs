@@ -4,10 +4,12 @@
 
 use log::trace;
 use rustc_hir::{self, intravisit};
+use rustc::hir;
 use rustc::mir;
 use rustc::ty::{self, TyCtxt};
-use syntax::ast;
-use syntax_pos::Span;
+use rustc_span;
+use rustc_interface::Queries;
+use rustc_session::config::BorrowckMode;
 use std::cell;
 use std::fs::File;
 use std::io::{self, Write, BufWriter};
@@ -20,32 +22,32 @@ use super::mir_analyses::initialization::{
 use crate::polonius_info::PoloniusInfo;
 use crate::configuration;
 
-pub fn dump_info<'r, 'a: 'r, 'tcx: 'a>(state: &'r mut driver::CompileState<'a, 'tcx>) {
+pub fn dump_info(tcx: TyCtxt) {
     trace!("[dump_info] enter");
 
-    let tcx = state.tcx.unwrap();
-
-    assert!(tcx.use_mir_borrowck(), "NLL is not enabled.");
+    assert!(matches!(tcx.borrowck_mode(), BorrowckMode::Mir), "NLL is not enabled.");
     let mut printer = InfoPrinter {
-        tcx: tcx,
+        tcx,
     };
-    intravisit::walk_crate(&mut printer, tcx.hir.krate());
+    intravisit::walk_crate(&mut printer, tcx.hir().krate());
 
     trace!("[dump_info] exit");
 }
 
-struct InfoPrinter<'a, 'tcx: 'a> {
+struct InfoPrinter<'tcx> {
     pub tcx: TyCtxt<'tcx>,
 }
 
-impl<'a, 'tcx> intravisit::Visitor<'tcx> for InfoPrinter<'a, 'tcx> {
-    fn nested_visit_map<'this>(&'this mut self) -> intravisit::NestedVisitorMap<'this, 'tcx> {
-        let map = &self.tcx.hir;
+impl<'tcx> intravisit::Visitor<'tcx> for InfoPrinter<'tcx> {
+    type Map = hir::map::Map<'tcx>;
+
+    fn nested_visit_map(&mut self) -> intravisit::NestedVisitorMap<hir::map::Map<'tcx>> {
+        let map = &self.tcx.hir();
         intravisit::NestedVisitorMap::All(map)
     }
 
     fn visit_fn(&mut self, fk: intravisit::FnKind<'tcx>, _fd: &'tcx rustc_hir::FnDecl,
-                _b: rustc_hir::BodyId, _s: Span, node_id: ast::NodeId) {
+                _b: rustc_hir::BodyId, _s: rustc_span::Span, hir_id: rustc_hir::HirId) {
         let name = match fk {
             intravisit::FnKind::ItemFn(name, ..) => name,
             _ => return,
@@ -59,20 +61,20 @@ impl<'a, 'tcx> intravisit::Visitor<'tcx> for InfoPrinter<'a, 'tcx> {
 
         match configuration::dump_mir_proc() {
             Some(value) => {
-                if name != value {
+                if name != rustc_span::symbol::Ident::from_str(&value) {
                     return;
                 }
             },
             _ => {},
         };
 
-        let def_id = self.tcx.hir.local_def_id(node_id);
+        let def_id = self.tcx.hir().local_def_id(hir_id);
         self.tcx.mir_borrowck(def_id);
 
         // Read Polonius facts.
-        let def_path = self.tcx.hir.def_path(def_id);
+        let def_path = self.tcx.hir().def_path(def_id);
 
-        let mir = self.tcx.mir_validated(def_id).borrow();
+        let mir = &*self.tcx.mir_validated(def_id).0.borrow();
 
         let graph_path = PathBuf::from("nll-facts")
             .join(def_path.to_filename_friendly_no_crate())
@@ -99,7 +101,7 @@ impl<'a, 'tcx> intravisit::Visitor<'tcx> for InfoPrinter<'a, 'tcx> {
 struct MirInfoPrinter<'a, 'tcx: 'a> {
     pub def_path: rustc::hir::map::definitions::DefPath,
     pub tcx: TyCtxt<'tcx>,
-    pub mir: &'a mir::Mir<'tcx>,
+    pub mir: &'a mir::Body<'tcx>,
     pub graph: cell::RefCell<BufWriter<File>>,
     pub initialization: DefinitelyInitializedAnalysisResult<'tcx>,
     pub polonius_info: PoloniusInfo,
@@ -165,7 +167,8 @@ impl<'a, 'tcx> MirInfoPrinter<'a, 'tcx> {
             write_graph!(self, "<tr><td>VARIABLES</td></tr>");
             write_graph!(self, "<tr><td>Name</td><td>Temporary</td><td>Type</td><td>Region</td></tr>");
             for (temp, var) in self.mir.local_decls.iter_enumerated() {
-                let name = var.name.map(|s| s.to_string()).unwrap_or(String::from(""));
+                // let name = var.name.map(|s| s.to_string()).unwrap_or(String::from(""));
+                let name = String::from("dummy");
                 let region = self.polonius_info.variable_regions
                     .get(&temp)
                     .map(|region| format!("{:?}", region))
@@ -219,7 +222,7 @@ impl<'a, 'tcx> MirInfoPrinter<'a, 'tcx> {
                         box mir::Constant {
                             literal: ty::Const {
                                 ty: ty::TyS {
-                                    sty: ty::TyKind::FnDef (def_id, substs),
+                                    kind: ty::TyKind::FnDef (def_id, substs),
                                     ..
                                 },
                                 ..
@@ -393,11 +396,9 @@ impl<'a, 'tcx> MirInfoPrinter<'a, 'tcx> {
             }
             TerminatorKind::Yield { .. } => { unimplemented!() }
             TerminatorKind::GeneratorDrop => { unimplemented!() }
-            TerminatorKind::FalseEdges { ref real_target, ref imaginary_targets } => {
+            TerminatorKind::FalseEdges { ref real_target, ref imaginary_target } => {
                 write_edge!(self, bb, real_target);
-                for target in imaginary_targets {
-                    write_edge!(self, bb, imaginary target);
-                }
+                write_edge!(self, bb, imaginary_target);
             }
             TerminatorKind::FalseUnwind { real_target, unwind } => {
                 write_edge!(self, bb, real_target);

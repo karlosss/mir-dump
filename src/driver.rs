@@ -5,18 +5,25 @@
 #![feature(box_syntax)]
 #![feature(rustc_private)]
 
-extern crate rustc_ap_rustc_span as syntax_pos;
-extern crate rustc_ap_syntax as syntax;
+extern crate rustc_span as syntax_pos;
+extern crate rustc_codegen_utils;
+extern crate rustc_driver;
+extern crate rustc_errors;
+extern crate rustc_metadata;
+extern crate rustc_interface;
+extern crate cute_log;
+pub extern crate rustc_session;
 
-mod driver_utils;
+// mod driver_utils;
 
-use crate::driver_utils::run;
 use log::{debug, trace, info};
 use mir_dump::{configuration, mir_dumper};
-use rustc::session;
 use rustc_codegen_utils::codegen_backend::CodegenBackend;
-use rustc_driver::{driver, getopts, Compilation, CompilerCalls, RustcDefaultCalls};
-use syntax::ast;
+use rustc_driver::{getopts, Compilation, RustcDefaultCalls, Callbacks, catch_fatal_errors};
+use rustc_session::{config, Session, parse};
+use rustc_metadata::creader;
+use rustc_interface::interface::Compiler;
+use rustc_interface::Queries;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -54,99 +61,46 @@ impl DumperCompilerCalls {
     }
 }
 
-impl<'a> CompilerCalls<'a> for DumperCompilerCalls {
-    fn early_callback(
-        &mut self,
-        matches: &getopts::Matches,
-        sopts: &session::config::Options,
-        cfg: &ast::CrateConfig,
-        descriptions: &rustc_errors::registry::Registry,
-        output: session::config::ErrorOutputType,
-    ) -> Compilation {
-        self.default
-            .early_callback(matches, sopts, cfg, descriptions, output)
+impl Callbacks for DumperCompilerCalls {
+    fn after_parsing<'tcx>(&mut self, _compiler: &Compiler, _queries: &'tcx Queries<'tcx>)
+        -> Compilation{
+        trace!("[after_parsing.callback] enter");
+
+        // Parse specifications: the original mir-dump does nothing here.
+
+        trace!("[after_parsing.callback] exit");
+        Compilation::Continue
     }
-    fn no_input(
-        &mut self,
-        matches: &getopts::Matches,
-        sopts: &session::config::Options,
-        cfg: &ast::CrateConfig,
-        odir: &Option<PathBuf>,
-        ofile: &Option<PathBuf>,
-        descriptions: &rustc_errors::registry::Registry,
-    ) -> Option<(session::config::Input, Option<PathBuf>)> {
-        self.default
-            .no_input(matches, sopts, cfg, odir, ofile, descriptions)
-    }
-    fn late_callback(
-        &mut self,
-        trans: &CodegenBackend,
-        matches: &getopts::Matches,
-        sess: &session::Session,
-        crate_stores: &rustc_metadata::cstore::CStore,
-        input: &session::config::Input,
-        odir: &Option<PathBuf>,
-        ofile: &Option<PathBuf>,
-    ) -> Compilation {
-        if configuration::test() {
-            if let rustc::session::config::Input::File(ref path) = input {
-                env::set_var("DUMP_TEST_FILE", path.to_str().unwrap());
-            }
+
+    fn after_analysis<'tcx>(&mut self, _compiler: &Compiler, _queries: &'tcx Queries<'tcx>)
+        -> Compilation{
+        trace!("[after_analysis.callback] enter");
+
+        // Type-check specifications: the original mir-dump does nothing here.
+
+        if configuration::dump_mir_info() {
+            _queries.global_ctxt()
+                .unwrap()
+                .peek_mut()
+                .enter(|tcx| mir_dumper::dump_info(tcx));
         }
-        self.default
-            .late_callback(trans, matches, sess, crate_stores, input, odir, ofile)
-    }
-    fn build_controller(
-        self: Box<Self>,
-        sess: &session::Session,
-        matches: &getopts::Matches,
-    ) -> driver::CompileController<'a> {
-        let mut control = self.default.build_controller(sess, matches);
 
-        let old = std::mem::replace(&mut control.after_parse.callback, box |_| {});
-        control.after_parse.callback = box move |state| {
-            trace!("[after_parse.callback] enter");
-            let start = Instant::now();
-
-            // Parse specifications.
-
-            let duration = start.elapsed();
-            info!("Parsing of annotations successful ({}.{} seconds)", duration.as_secs(), duration.subsec_millis()/10);
-            trace!("[after_parse.callback] exit");
-            old(state);
-        };
-
-        let old = std::mem::replace(&mut control.after_analysis.callback, box |_| {});
-        control.after_analysis.callback = box move |state| {
-            trace!("[after_analysis.callback] enter");
-            let start = Instant::now();
-
-            // Type-check specifications.
-
-            let duration = start.elapsed();
-            info!("Type-checking of annotations successful ({}.{} seconds)", duration.as_secs(), duration.subsec_millis()/10);
-
-            // Call the verifier.
-            if configuration::dump_mir_info() {
-                mir_dumper::dump_info(state);
-            }
-
-            trace!("[after_analysis.callback] exit");
-            old(state);
-        };
+        trace!("[after_analysis.callback] exit");
 
         if !configuration::full_compilation() {
             debug!("The program will not be compiled.");
-            control.after_analysis.stop = Compilation::Stop;
+            Compilation::Stop
         }
-        control
+        else{
+            Compilation::Continue
+        }
     }
 }
 
 pub fn main() {
-    env_logger::init();
+    cute_log::init().expect("failed to initialize log");
 
-    let exit_status = run(move || {
+    let exit_status = catch_fatal_errors(move || {
         let mut args: Vec<String> = env::args().collect();
 
         if args.len() <= 1 {
@@ -187,10 +141,15 @@ pub fn main() {
         args.push("--cfg".to_string());
         args.push(r#"feature="mir_dumper""#.to_string());
 
-        let compiler_calls = Box::new(DumperCompilerCalls::new());
+        let mut compiler_calls = DumperCompilerCalls::new();
 
         debug!("rustc command: '{}'", args.join(" "));
-        rustc_driver::run_compiler(&args, compiler_calls, None, None)
-    });
-    std::process::exit(exit_status as i32);
+        rustc_driver::run_compiler(&args, &mut compiler_calls, None, None)
+    }).and_then(|exit_status| exit_status);
+
+    let exit_status = match exit_status {
+        Ok(_) => rustc_driver::EXIT_SUCCESS,
+        Err(_) => rustc_driver::EXIT_FAILURE,
+    };
+    std::process::exit(exit_status);
 }

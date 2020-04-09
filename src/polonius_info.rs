@@ -29,7 +29,7 @@ pub struct PoloniusInfo {
 fn add_fake_facts<'a, 'tcx:'a>(
     all_facts: &mut facts::AllInputFacts,
     interner: &facts::Interner,
-    mir: &'a mir::Mir<'tcx>,
+    mir: &'a mir::Body<'tcx>,
     variable_regions: &HashMap<mir::Local, facts::Region>,
     call_magic_wands: &mut HashMap<facts::Loan, mir::Local>
 ) -> (Vec<facts::Loan>, Vec<facts::Loan>) {
@@ -71,21 +71,21 @@ fn add_fake_facts<'a, 'tcx:'a>(
                     for &(region1, region2) in regions.iter() {
                         debug!("{:?} {:?} {:?}", location, region1, region2);
                     }
-                    match place {
-                        mir::Place::Local(local) => {
-                            if let Some(var_region) = variable_regions.get(&local) {
-                                debug!("var_region = {:?} loan = {}", var_region, last_loan_id);
-                                let loan = facts::Loan::from(last_loan_id);
-                                borrow_region.push(
-                                    (*var_region,
-                                     loan,
-                                     *point));
-                                last_loan_id += 1;
-                                call_magic_wands.insert(loan, local);
-                            }
-                        }
-                        x => unimplemented!("{:?}", x)
-                    }
+                    // match place {
+                    //     mir::Place::Local(local) => {
+                    //         if let Some(var_region) = variable_regions.get(&local) {
+                    //             debug!("var_region = {:?} loan = {}", var_region, last_loan_id);
+                    //             let loan = facts::Loan::from(last_loan_id);
+                    //             borrow_region.push(
+                    //                 (*var_region,
+                    //                  loan,
+                    //                  *point));
+                    //             last_loan_id += 1;
+                    //             call_magic_wands.insert(loan, local);
+                    //         }
+                    //     }
+                    //     x => unimplemented!("{:?}", x)
+                    // }
                 }
                 for &(region1, _region2) in &regions {
                     let new_loan = facts::Loan::from(last_loan_id);
@@ -109,9 +109,9 @@ fn add_fake_facts<'a, 'tcx:'a>(
 }
 
 impl PoloniusInfo {
-    pub fn new<'a, 'tcx: 'a>(tcx: ty::TyCtxt<'tcx>, def_id: DefId, mir: &'a mir::Mir<'tcx>) -> Self {
+    pub fn new<'a, 'tcx: 'a>(tcx: ty::TyCtxt<'tcx>, def_id: DefId, mir: &'a mir::Body<'tcx>) -> Self {
         // Read Polonius facts.
-        let def_path = tcx.hir.def_path(def_id);
+        let def_path = tcx.hir().def_path(def_id);
         let dir_path = PathBuf::from("nll-facts").join(def_path.to_filename_friendly_no_crate());
         debug!("Reading facts from: {:?}", dir_path);
         let mut facts_loader = facts::FactLoader::new();
@@ -161,8 +161,8 @@ impl PoloniusInfo {
 }
 
 /// Check if the statement is assignment.
-fn is_assignment<'tcx>(mir: &mir::Mir<'tcx>,
-                       location: mir::Location) -> bool {
+fn is_assignment(mir: &mir::Body,
+                 location: mir::Location) -> bool {
     let mir::BasicBlockData { ref statements, .. } = mir[location.block];
     if statements.len() == location.statement_index {
         return false;
@@ -173,8 +173,8 @@ fn is_assignment<'tcx>(mir: &mir::Mir<'tcx>,
     }
 }
 
-fn is_call<'tcx>(mir: &mir::Mir<'tcx>,
-                 location: mir::Location) -> bool {
+fn is_call(mir: &mir::Body,
+           location: mir::Location) -> bool {
     let mir::BasicBlockData { ref statements, ref terminator, .. } = mir[location.block];
     if statements.len() != location.statement_index {
         return false;
@@ -186,7 +186,7 @@ fn is_call<'tcx>(mir: &mir::Mir<'tcx>,
 }
 
 /// Extract the call terminator at the location. Otherwise return None.
-fn get_call_destination<'tcx>(mir: &mir::Mir<'tcx>, location: mir::Location) -> Option<mir::Place<'tcx>> {
+fn get_call_destination<'tcx>(mir: &mir::Body<'tcx>, location: mir::Location) -> Option<mir::Place<'tcx>> {
     let mir::BasicBlockData { ref statements, ref terminator, .. } = mir[location.block];
     if statements.len() != location.statement_index {
         return None;

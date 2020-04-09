@@ -51,7 +51,7 @@ impl<'tcx> PlaceSet<'tcx> {
     pub fn insert<'a>(
         &mut self,
         place: &mir::Place<'tcx>,
-        mir: &mir::Mir<'tcx>,
+        mir: &mir::Body<'tcx>,
         tcx: TyCtxt<'tcx>,
     ) {
         self.check_invariant();
@@ -73,7 +73,7 @@ impl<'tcx> PlaceSet<'tcx> {
     pub fn remove<'a>(
         &mut self,
         place: &mir::Place<'tcx>,
-        mir: &mir::Mir<'tcx>,
+        mir: &mir::Body<'tcx>,
         tcx: TyCtxt<'tcx>,
     ) {
         self.check_invariant();

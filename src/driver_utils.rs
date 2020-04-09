@@ -10,13 +10,15 @@
 
 //! Code adapted from the Rust compiler source code, file `librustc_driver/lib.rs`.
 
-use rustc::session::CompileIncomplete;
+#![feature(rustc_private)]
+
+use mir_dump::rustc_session;
 use rustc_driver::in_rustc_thread;
 use rustc_errors as errors;
 use syntax_pos::MultiSpan;
-use rustc::session::{config, Session};
+use rustc_session::{config, Session};
 use std::panic;
-use rustc::session::CompileResult;
+use rustc_session::CompileResult;
 
 static MIR_DUMP_BUG_REPORT_URL: &str = "https://github.com/vakaras/mir-dump";
 
@@ -26,6 +28,7 @@ static MIR_DUMP_BUG_REPORT_URL: &str = "https://github.com/vakaras/mir-dump";
 /// The diagnostic emitter yielded to the procedure should be used for reporting
 /// errors of the compiler.
 fn monitor<F: FnOnce() + Send + 'static>(f: F) {
+    todo!();
     let result = in_rustc_thread(move || {
         f()
     });
